@@ -1,0 +1,33 @@
+# Configurações globais da aplicação
+replicaCount: 2
+
+image:
+  repository: registry.iximiuz.com/sre-app
+  pullPolicy: IfNotPresent
+  tag: "v1"
+
+# Definição de recursos conforme página 3 do PDF
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Configurações de HPA (Requisito: Tarefa 2)
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPU: 70    # Requisito PDF: 70%
+  targetMemory: 75 # Requisito PDF: 75%
+
+# Configurações de PDB (Conhecimento Sênior)
+pdb:
+  enabled: true
+  minAvailable: 1
+
+# Variáveis de ambiente (Requisito: Tarefa 2)
+env:
+  APP_ENV: staging
