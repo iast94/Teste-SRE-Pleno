@@ -36,7 +36,13 @@ Para o funcionamento do pipeline, configure os seguintes Segredos em seu reposit
 | `DOCKERHUB_TOKEN` | Seu Personal Access Token do Docker Hub. |
 | `KUBE_CONFIG_DATA` | O conteúdo do seu arquivo `~/.kube/config` em Base64. |
 
-### 2. Como exportar o KUBECONFIG
+### 2. Como gerar o Token do Docker Hub
+Para maior segurança, utilize um Personal Access Token (PAT) em vez da sua senha:
+1. No Docker Hub, vá em **Account Settings > Security > Generate new token**.
+2. Gere um token com permissões de `Read & Write`.
+3. Use este token no secret `DOCKERHUB_TOKEN`.
+
+### 3. Como exportar o KUBECONFIG
 O pipeline utiliza o arquivo de configuração para autenticação externa.
 
 1. No terminal onde o `kubectl` está configurado, execute:
@@ -44,12 +50,6 @@ O pipeline utiliza o arquivo de configuração para autenticação externa.
    cat ~/.kube/config | base64 -w 0
 2. Copie toda a string resultante.
 3. No GitHub, cole este valor no secret `KUBE_CONFIG_DATA`.
-
-### 3. Como gerar o Token do Docker Hub
-Para maior segurança, utilize um Personal Access Token (PAT) em vez da sua senha:
-1. No Docker Hub, vá em **Account Settings > Security > New Access Token**.
-2. Gere um token com permissões de `Read & Write`.
-3. Use este token no secret `DOCKERHUB_TOKEN`.
 
 ### 4. Execução
 Qualquer alteração enviada para a branch `main` disparará o workflow `.github/workflows/main.yml`. Este pipeline gerencia:
