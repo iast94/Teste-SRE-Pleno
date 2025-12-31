@@ -1,4 +1,48 @@
-# Teste-Pr-tico-SRE-Pleno
+# Teste-SRE-Pleno
+
+## 🚀 Quick Start (CI/CD Flow)
+Este projeto utiliza automação total. Para implantar a solução:
+
+1. **Configuração:** Adicione os `Secrets` necessários no seu repositório GitHub (veja a seção de Instalação).
+2. **Deploy:** Realize um `git push` para a branch `main`.
+3. **Monitoramento:** O pipeline fará o build, push e deploy via Helm automaticamente no cluster configurado.
+
+## 🏗 Arquitetura
+A solução consiste em uma aplicação Node.js (TypeScript) containerizada, rodando em um cluster Kubernetes (k3s) com auto-scaling (HPA), monitoramento via Prometheus/Grafana e agregação de logs via ELK Stack.
+
+## ⚖️ Por que k3s? (Decisão de Infraestrutura)
+Diferente de ferramentas como **Kind** (Kubernetes in Docker) ou **Minikube**, a escolha pelo **k3s** para este projeto baseia-se em:
+
+* **Leveza e Performance:** O k3s é um binário único de < 100MB que consome significativamente menos memória RAM que o Minikube, sendo ideal para ambientes de SRE/DevOps efêmeros.
+* **Pronto para Produção:** Enquanto o Kind é focado estritamente em testes locais de CI, o k3s é uma distribuição certificada pela CNCF pronta para uso em produção, o que aproxima este laboratório de um cenário real.
+* **Simplicidade Operacional:** O k3s remove drivers legados e cloud providers desnecessários, mas mantém suporte total a Helm e Manifestos padrão, facilitando a portabilidade sem o overhead de gerenciar máquinas virtuais (Minikube) ou containers Docker aninhados (Kind).
+
+## 🛠 Componentes
+* **App:** Microserviço em Node.js com suporte a health checks e exportação de métricas.
+* **K8S:** Cluster multi-node com Deployment, Service, HPA, PDB e ConfigMaps.
+* **CI/CD:** Pipeline automatizado via GitHub Actions para Build e Deploy (Docker Hub + Helm).
+* **Observabilidade:** Stack Prometheus e ELK integrados.
+
+## 🛠️ Como Reproduzir este Projeto (Guia de Instalação)
+
+Este projeto foi desenhado para ser totalmente portátil via **Infrastructure as a Template**.
+
+### 1. Configuração de Secrets no GitHub
+Para o funcionamento do pipeline, configure os seguintes Segredos em seu repositório (**Settings > Secrets and variables > Actions > New repository secret**):
+
+| Nome do Secret | Descrição |
+| :--- | :--- |
+| `DOCKERHUB_USERNAME` | Seu nome de usuário no Docker Hub. |
+| `DOCKERHUB_TOKEN` | Seu Personal Access Token do Docker Hub. |
+| `KUBE_CONFIG_DATA` | O conteúdo do seu arquivo `~/.kube/config` em Base64. |
+
+### 2. Como exportar o KUBECONFIG
+O pipeline utiliza o arquivo de configuração para autenticação externa.
+
+1. No terminal onde o `kubectl` está configurado (ex: iximiuz), execute:
+   ```bash
+   cat ~/.kube/config | base64 -w 0
+
 ## 🐳Tarefa 1: Containerização & Execução - Decisões Técnicas: Dockerfile
 
 A estratégia de containerização foi focada em segurança, otimização de camadas e confiabilidade para atender aos requisitos de SRE Pleno.
@@ -44,3 +88,29 @@ A arquitetura de deployment foi projetada para garantir alta disponibilidade, es
 
 ### 5. Estratégia de Deploy (Rolling Update)
 * **Zero Downtime:** Foi configurada a estratégia `RollingUpdate` com `maxUnavailable: 0`. Isso garante que o Kubernetes nunca remova uma versão antiga da aplicação sem antes ter uma nova versão saudável e pronta para receber tráfego, eliminando quedas de serviço durante atualizações de versão.
+* **Justificativa:** Esta escolha garante que a capacidade total da aplicação (2 réplicas) seja preservada durante todo o processo de atualização. O Kubernetes é forçado a instanciar um novo Pod saudável antes de iniciar o encerramento de qualquer instância da versão anterior, evitando gargalos de processamento durante janelas de deploy.
+
+## 🚀 Tarefa 4: Pipeline CI/CD - Decisões Técnicas: CI/CD (GitHub Actions)
+
+A automação do ciclo de vida da aplicação foi implementada via GitHub Actions, focando em garantir a integridade do código e a consistência dos deploys.
+
+### 1. Pipeline de Integração Contínua (CI)
+* **Build Multi-arquitetura:** O pipeline realiza o build da imagem Docker utilizando o contexto do Dockerfile otimizado, garantindo que apenas imagens que passaram nos testes de build sejam enviadas ao registro.
+* **Versionamento de Imagem:** Foi adotada a estratégia de versionamento via SHA do commit e a tag `latest` para o ambiente de staging, permitindo rastreabilidade total de qual versão do código está rodando em qual container.
+
+### 2. Pipeline de Entrega Contínua (CD)
+* **Helm Lint:** Antes de qualquer alteração no cluster, o pipeline executa o `helm lint` para validar a sintaxe e as boas práticas dos templates do Chart, evitando falhas de deploy por erros de indentação ou lógica de template.
+* **Idempotência com Helm:** O deploy é realizado através do comando `helm upgrade --install`. Esta abordagem garante que o pipeline seja idempotente: se o release não existir, ele é criado; se já existir, é atualizado com as novas configurações e imagem.
+
+### 3. Segurança e Portabilidade (Secrets Management)
+* **Kubeconfig as a Secret:** A autenticação com o cluster Kubernetes é realizada através da variável de ambiente `KUBECONFIG` armazenada nos GitHub Secrets. 
+* **Justificativa:** Esta abordagem desacopla o pipeline da infraestrutura subjacente (iximiuz), permitindo que a estratégia de deploy seja reutilizada em qualquer provedor de nuvem ou ambiente on-premises sem alterações no código. Além disso, garante que credenciais sensíveis nunca fiquem expostas no repositório.
+
+### 4. Gestão de Imagens e Registro Externo (Docker Hub)
+* **External Registry:** Foi adotado o Docker Hub como registro oficial de imagens da solução, em detrimento do registro efêmero local. 
+* **Justificativa:** O uso de um registro externo garante a persistência dos artefatos de build independentemente da vida útil do cluster de teste. Isso facilita auditorias de segurança externas e permite que a imagem seja testada em múltiplos ambientes (Hybrid Cloud) sem necessidade de re-build.
+* **Autenticação Segura:** O acesso ao Docker Hub é realizado via Personal Access Tokens (PAT) injetados como segredos no GitHub Actions, evitando a exposição de senhas globais da conta.
+
+### 5. Portabilidade e Abstração do Pipeline
+* **Generic Workflow:** O pipeline foi projetado para ser 100% agnóstico ao usuário. Todas as referências a nomes de registro, tags e contextos de infraestrutura foram movidas para GitHub Secrets.
+* **Justificativa:** Isso permite que o projeto seja replicado por qualquer outro profissional apenas configurando seus próprios Segredos (Secrets), sem a necessidade de alterar uma única linha de código nos arquivos YAML ou Helm. Esta abordagem segue o princípio de "Infrastructure as a Template".

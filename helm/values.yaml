@@ -8,9 +8,9 @@ strategy:
     maxUnavailable: 0
 
 image:
-  repository: registry.iximiuz.com/sre-app
-  pullPolicy: IfNotPresent
-  tag: "v1"
+  repository: placeholder-user/sre-app # Será sobrescrito pelo pipeline
+  pullPolicy: Always
+  tag: "latest"
 
 securityContext:
   runAsUser: 1001
