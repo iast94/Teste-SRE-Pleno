@@ -1,9 +1,9 @@
 # Teste-SRE-Pleno
 
-## 🚀 Quick Start (CI/CD Flow)
+## 🚀 Introdução
 Este projeto utiliza automação total. Para implantar a solução:
 
-1. **Configuração:** Adicione os `Secrets` necessários no seu repositório GitHub (veja a seção de Instalação).
+1. **Configuração:** Adicione os `Secrets` necessários no seu repositório GitHub (veja a seção de Guia de Instalação).
 2. **Deploy:** Realize um `git push` para a branch `main`.
 3. **Monitoramento:** O pipeline fará o build, push e deploy via Helm automaticamente no cluster configurado.
 
@@ -23,7 +23,7 @@ Diferente de ferramentas como **Kind** (Kubernetes in Docker) ou **Minikube**, a
 * **CI/CD:** Pipeline automatizado via GitHub Actions para Build e Deploy (Docker Hub + Helm).
 * **Observabilidade:** Stack Prometheus e ELK integrados.
 
-## 🛠️ Como Reproduzir este Projeto (Guia de Instalação)
+## 🛠️ Guia de Instalação
 
 Este projeto foi desenhado para ser totalmente portátil via **Infrastructure as a Template**.
 
@@ -39,9 +39,22 @@ Para o funcionamento do pipeline, configure os seguintes Segredos em seu reposit
 ### 2. Como exportar o KUBECONFIG
 O pipeline utiliza o arquivo de configuração para autenticação externa.
 
-1. No terminal onde o `kubectl` está configurado (ex: iximiuz), execute:
+1. No terminal onde o `kubectl` está configurado, execute:
    ```bash
    cat ~/.kube/config | base64 -w 0
+2. Copie toda a string resultante.
+3. No GitHub, cole este valor no secret `KUBE_CONFIG_DATA`.
+
+### 3. Como gerar o Token do Docker Hub
+Para maior segurança, utilize um Personal Access Token (PAT) em vez da sua senha:
+1. No Docker Hub, vá em **Account Settings > Security > New Access Token**.
+2. Gere um token com permissões de `Read & Write`.
+3. Use este token no secret `DOCKERHUB_TOKEN`.
+
+### 4. Execução
+Qualquer alteração enviada para a branch `main` disparará o workflow `.github/workflows/main.yml`. Este pipeline gerencia:
+* **Build e Push:** Envio da imagem para o Docker Hub.
+* **Deploy:** Criação do namespace e instalação via Helm no Kubernetes.
 
 ## 🐳Tarefa 1: Containerização & Execução - Decisões Técnicas: Dockerfile
 
