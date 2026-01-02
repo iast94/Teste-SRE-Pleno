@@ -8,7 +8,7 @@ Este projeto utiliza automação total. Para implantar a solução:
 3. **Monitoramento:** O pipeline fará o build, push e deploy via Helm automaticamente no cluster configurado.
 
 ## 🏗 Arquitetura
-A solução consiste em uma aplicação Node.js (TypeScript) containerizada, rodando em um cluster Kubernetes (k3s) com auto-scaling (HPA), monitoramento via Prometheus/Grafana e agregação de logs via ELK Stack.
+A solução consiste em uma aplicação Node.js containerizada, rodando em um cluster Kubernetes (k3s) com auto-scaling (HPA), monitoramento via Prometheus/Grafana e agregação de logs via ELK Stack.
 
 ## ⚖️ Por que k3s? (Decisão de Infraestrutura)
 Diferente de ferramentas como **Kind** (Kubernetes in Docker) ou **Minikube**, a escolha pelo **k3s** para este projeto baseia-se em:
