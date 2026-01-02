@@ -1,37 +1,43 @@
-name: CI/CD Pipeline
+name: SRE Pipeline
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-and-deploy:
+  lint:
     #runs-on: ubuntu-22.04
-    runs-on: self-hosted
-
+    runs-on: self-hosted # Usando o seu runner local
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Login usando Secret para o Usuário e para o Token
+      - name: Dockerfile Lint
+        uses: hadolint/hadolint-action@v1.6.0
+        with:
+          dockerfile: Dockerfile
+
+  build-and-deploy:
+    needs: lint # Garante que o build só comece se o lint passar
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # Build e Push usando o Secret do Usuário no nome da imagem
+      
       - name: Build and Push
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/sre-app:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/sre-app:1.${{ github.run_number }}
-
-      - name: Install Helm
-        uses: azure/setup-helm@v3
+            ${{ secrets.DOCKERHUB_USERNAME }}/sre-app:latest
 
       - name: Deploy to Kubernetes
         env:
