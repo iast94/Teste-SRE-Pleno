@@ -4,6 +4,11 @@ on:
   push:
     branches: [ main ]
 
+env:
+  K8S_NAMESPACE: sre-test
+  HELM_RELEASE_NAME: sre-app
+  CHART_PATH: ./helm
+
 jobs:
   lint:
     #runs-on: ubuntu-22.04
@@ -46,12 +51,12 @@ jobs:
           mkdir -p ~/.kube
           echo "$KUBECONFIG_DATA" | base64 -d > ~/.kube/config
           
-          # Garante o Namespace via variável (ou Secret se preferir)
-          kubectl create namespace sre-test --dry-run=client -o yaml | kubectl apply -f -
+          # Cria o namespace se não existir
+          kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
           
-          # Injeção dinâmica do repositório via linha de comando
-          helm upgrade --install sre-app ./charts/my-app \
-            --namespace sre-test \
-            --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/sre-app \
+          # Atualiza o Helm usando a imagem do Docker Hub
+          helm upgrade --install ${HELM_RELEASE_NAME} ${CHART_PATH} \
+            --namespace ${K8S_NAMESPACE} \
+            --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/${HELM_RELEASE_NAME} \
             --set image.tag=1.${{ github.run_number }} \
             --wait
