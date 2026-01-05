@@ -36,10 +36,11 @@ releases:
   - name: grafana-secrets
     namespace: observability
     chart: ./helm/secrets/grafana-admin-secret.yaml
+    createNamespace: true # O Helmfile cria o namespace se ele não existir
     needs:
       - observability/kube-prometheus-stack # Garante a ordem correta
     hooks:
-      - events: ["prepare"]
+      - events: ["presync"] # Executa após a garantia do namespace, mas antes do sync da release
         command: "kubectl"
         args: ["apply", "-f", "./helm/grafana/secrets/grafana-admin-secret.yaml"]
 
