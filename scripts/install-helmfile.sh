@@ -14,10 +14,11 @@ if ! command -v helmfile &> /dev/null; then
     # Move para o path do sistema
     sudo mv helmfile /usr/local/bin/
 
-    # Instalação do plugin necessário para o comando 'diff' do Helmfile
-    helm plugin install https://github.com/databus23/helm-diff
-    
     echo "Helmfile instalado com sucesso!"
 else
     echo "Helmfile já está instalado. Versão: $(helmfile --version)"
 fi
+
+# Instalação do plugin necessário para o comando 'diff' do Helmfile
+echo "Garantindo instalação do plugin helm-diff..."
+helm plugin install https://github.com/databus23/helm-diff || echo "Plugin já instalado ou erro na instalação."
