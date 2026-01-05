@@ -11,7 +11,7 @@ releases:
     chart: prometheus-community/kube-prometheus-stack
     version: 65.4.0
     installed: true
-    createNamespace: true
+    createNamespace: true # O Helmfile cria o namespace se ele não existir
     values:
       - ./helm/values-prometheus.yaml
     # Hook indispensável para evitar erros de 'kind not found'
@@ -24,8 +24,9 @@ releases:
   # Tarefa 3: Grafana (Prioridade 2)
   - name: grafana
     namespace: observability
-    chart: grafana/grafana
+    chart: grafana/grafana  
     version: 7.3.0
+    createNamespace: true # O Helmfile cria o namespace se ele não existir
     needs:
       - observability/kube-prometheus-stack # Garante a ordem correta
     values:
