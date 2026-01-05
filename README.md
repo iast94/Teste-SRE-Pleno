@@ -89,7 +89,8 @@ Qualquer alteração enviada para a branch `main` disparará o workflow `.github
 
 A arquitetura de deployment foi projetada para garantir alta disponibilidade, escalabilidade automática e isolamento de recursos, seguindo as melhores práticas de infraestrutura como código.
 
-### 1. Parametrização e Reutilização (Helm)
+#### 1. Orquestração Declarativa e Reutilização (Helm & Helmfile)
+* **Orquestração via Helmfile:** A utilização do Helmfile permite gerenciar o ciclo de vida da aplicação e da stack de observabilidade de forma unificada. Através da definição de dependências (`needs`), garante-se que o monitoramento esteja operacional antes do deploy da aplicação principal.
 * **Abstração via Values:** Todos os parâmetros sensíveis e de configuração (portas, caminhos de health check, limites de recursos) foram movidos para o arquivo `values.yaml`. Isso permite que o mesmo chart seja utilizado em diferentes ambientes apenas alterando o arquivo de valores, sem a necessidade de modificar os templates base.
 * **Uso de Helpers:** Foi implementado o arquivo `_helpers.tpl` para gerenciar a nomenclatura dos recursos e labels de forma dinâmica. O uso da função `fullname` garante a unicidade dos nomes dentro do cluster, evitando colisões de recursos entre diferentes releases.
 
@@ -99,6 +100,7 @@ A arquitetura de deployment foi projetada para garantir alta disponibilidade, es
 
 ### 3. Resiliência e Ciclo de Vida (PDB e Probes)
 * **Pod Disruption Budget (PDB):** Foi implementado um PDB com `minAvailable: 1`. Esta configuração é vital para operações de SRE, pois impede que manutenções automatizadas (como o dreno de um nó) desliguem todas as instâncias da aplicação simultaneamente, garantindo que pelo menos 50% da capacidade esteja sempre ativa.
+* **Startup Probe:** Implementada para proteger o processo de inicialização da aplicação, permitindo um tempo de carência maior para o carregamento de dependências antes que as probes de integridade iniciem suas verificações.
 * **Health Checks Dinâmicos:** As Probes de `liveness` e `readiness` foram parametrizadas para validar a saúde da aplicação em tempo real. A separação entre liveness (reinício do container) e readiness (entrada no balanceador) garante que o tráfego só seja direcionado para pods que completaram seu processo de inicialização.
 
 ### 4. Escalabilidade Automática (HPA v2)
@@ -114,24 +116,28 @@ A arquitetura de deployment foi projetada para garantir alta disponibilidade, es
 A automação do ciclo de vida da aplicação foi implementada via GitHub Actions, focando em garantir a integridade do código e a consistência dos deploys.
 
 ### 1. Estratégia de Runner: GitHub Self-hosted
-
-* **Conectividade Local:** Como o cluster Kubernetes (k3d) está rodando localmente, runners públicos do GitHub não possuem rota de rede para alcançar o plano de controle (Control Plane) do cluster devido a restrições de firewall e IPs privados.
-* **Segurança de Rede:** O uso do runner local elimina a necessidade de expor o API Server do Kubernetes para a internet pública (via Ngrok ou túneis), mantendo a comunicação restrita ao ambiente interno.
-* **Eficiência de Build:** O runner compartilha o daemon do Docker da máquina host, permitindo o reaproveitamento imediato de cache de camadas (layers), o que reduz drasticamente o tempo de build das imagens em comparação a runners efêmeros na nuvem.
-* **Persistência de Ferramental:** Diferente de ambientes de laboratório temporários, o runner local garante a persistência das configurações de context do kubectl e do Helm, tornando o ciclo de desenvolvimento e deploy mais ágil e previsível.
+* **Conectividade Local:** Como o cluster Kubernetes (k3d) está rodando localmente, foi utilizado um runner self-hosted para permitir que o pipeline alcance o Control Plane do cluster sem a necessidade de expor APIs para a internet pública (via Ngrok ou túneis), mantendo a comunicação restrita ao ambiente interno.
+* **Segurança de Rede:** O uso do runner local elimina vetores de ataque externos, mantendo toda a comunicação de deploy restrita ao ambiente controlado.
+* **Eficiência de Cache:** O runner compartilha o daemon do Docker da máquina host, permitindo o reaproveitamento imediato de cache de camadas (layers), o que reduz drasticamente o tempo de build das imagens em comparação a runners efêmeros na nuvem.
+* **Persistência:** Diferente de ambientes de laboratório temporários, o runner local garante a persistência das configurações de context do kubectl e do Helm, tornando o ciclo de desenvolvimento e deploy mais ágil e previsível.
 
 ### 2. Pipeline de Integração Contínua (CI)
-* **Build Multi-arquitetura:** O pipeline realiza o build da imagem Docker utilizando o contexto do Dockerfile otimizado, garantindo que apenas imagens que passaram nos testes de build sejam enviadas ao registro.
-* **Versionamento de Imagem:** Foi adotada a estratégia de versionamento via tags numéricas incrementais baseadas no `${{ github.run_number }}`. Esta abordagem garante que cada build gere uma versão única, legível e sequencial (ex: `1.10`, `1.11`), facilitando o rastreio de deploys e a gestão de imagens no Docker Hub.
+* **Uso de `uses` para Tarefas Utilitárias:** Foi adotado o padrão `uses` para etapas como `actions/checkout` e `docker/setup-buildx-action`. Esta escolha justifica-se pela confiabilidade de Actions oficiais que simplificam tarefas complexas de autenticação e setup.
+* **Build Multi-arquitetura:** O pipeline realiza o build da imagem Docker utilizando o contexto do Dockerfile multi-stage, garantindo que apenas imagens que passaram nos testes de build avancem para a etapa de push.
+* **Versionamento de Imagem:** Foi adotada a estratégia de versionamento via tags numéricas incrementais baseadas no `${{ github.run_number }}`. Esta abordagem garante que cada build gere uma versão única, legível e sequencial (ex: `1.10`, `1.11`), facilitando o rastreio de deploys, a gestão de imagens no Docker Hub e o rollbacks.
 
 ### 3. Pipeline de Entrega Contínua (CD)
 * **Helm Lint:** Antes de qualquer alteração no cluster, o pipeline executa o `helm lint` para validar a sintaxe e as boas práticas dos templates do Chart, evitando falhas de deploy por erros de indentação ou lógica de template.
-* **Idempotência com Helm:** O deploy é realizado através do comando `helm upgrade --install`. Esta abordagem garante que o pipeline seja idempotente: se o release não existir, ele é criado; se já existir, é atualizado com as novas configurações e imagem.
+* **Uso de `run` para Deploys Críticos:** Para as etapas de deploy (Helmfile), foi priorizado o uso de comandos `run`. Esta decisão técnica visa o controle total sobre a infraestrutura de CI/CD, permitindo maior visibilidade de debug e evitando a dependência de "caixas-pretas" de terceiros no caminho crítico de produção.
+* **Instalação via Script de Bootstrap:** A instalação do Helmfile no Runner foi realizada através de um script de shell customizado. Esta prática permite o versionamento da lógica de instalação, garante que a mesma versão do binário seja utilizada em qualquer ambiente e facilita a testabilidade local do processo de setup.
+* **Orquestração Declarativa:** Foi utilizado o **Helmfile** para gerenciar a aplicação e suas dependências de forma declarativa, permitindo aplicar toda a stack com um único comando `helmfile apply`.
+* **Idempotência e Sincronização:** O Helmfile garante que o cluster reflita exatamente o estado definido nos arquivos de configuração, tratando atualizações e instalações de forma nativa e segura.
+* **Abstração de Ambientes:** O uso do Helmfile facilita a separação de contextos, permitindo que o mesmo pipeline gerencie diferentes estados do cluster de forma organizada.
 * **Imutabilidade de Deploy:** O pipeline injeta a tag específica do build diretamente no manifesto do Kubernetes via Helm durante o deploy. Isso assegura que o cluster execute exatamente a versão de artefato gerada no ciclo de CI, eliminando a ambiguidade de versões.
 
 ### 4. Segurança e Portabilidade (Secrets Management)
 * **Kubeconfig as a Secret:** A autenticação com o cluster Kubernetes é realizada através da variável de ambiente `KUBECONFIG` armazenada nos GitHub Secrets. 
-* **Justificativa:** Esta abordagem desacopla o pipeline da infraestrutura subjacente (iximiuz), permitindo que a estratégia de deploy seja reutilizada em qualquer provedor de nuvem ou ambiente on-premises sem alterações no código. Além disso, garante que credenciais sensíveis nunca fiquem expostas no repositório.
+* **Justificativa:** Esta abordagem desacopla o pipeline da infraestrutura subjacente, permitindo que a estratégia de deploy seja reutilizada em qualquer provedor de nuvem ou ambiente on-premises sem alterações no código. Além disso, garante que credenciais sensíveis nunca fiquem expostas no repositório.
 
 ### 5. Gestão de Imagens e Registro Externo (Docker Hub)
 * **External Registry:** Foi adotado o Docker Hub como registro oficial de imagens da solução, em detrimento do registro efêmero local. 
@@ -139,5 +145,5 @@ A automação do ciclo de vida da aplicação foi implementada via GitHub Action
 * **Autenticação Segura:** O acesso ao Docker Hub é realizado via Personal Access Tokens (PAT) injetados como segredos no GitHub Actions, evitando a exposição de senhas globais da conta.
 
 ### 6. Portabilidade e Abstração do Pipeline
-* **Generic Workflow:** O pipeline foi projetado para ser 100% agnóstico ao usuário. Todas as referências a nomes de registro, tags e contextos de infraestrutura foram movidas para GitHub Secrets.
+* **Generic Workflow:** O pipeline foi projetado para ser agnóstico. Todas as referências a nomes de registro, tags, variáveis, secrets e contextos de infraestrutura foram movidas para GitHub Secrets.
 * **Justificativa:** Isso permite que o projeto seja replicado por qualquer outro profissional apenas configurando seus próprios Segredos (Secrets), sem a necessidade de alterar uma única linha de código nos arquivos YAML ou Helm. Esta abordagem segue o princípio de "Infrastructure as a Template".

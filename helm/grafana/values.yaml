@@ -82,7 +82,6 @@ deploymentStrategy:
 # Persistência para o Grafana (Plugins e Configurações)
 persistence:
   enabled: true
-  storageClassName: local-path
   accessModes: ["ReadWriteOnce"]
   size: 1Gi
 

@@ -17,7 +17,6 @@ prometheus:
     storageSpec:
       volumeClaimTemplate:
         spec:
-          storageClassName: local-path # Padrão do k3d/k3s
           accessModes: ["ReadWriteOnce"]
           resources:
             requests:
