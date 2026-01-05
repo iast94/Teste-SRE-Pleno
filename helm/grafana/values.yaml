@@ -1,0 +1,104 @@
+admin:
+  existingSecret: grafana-admin
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  initialDelaySeconds: 20
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+startupProbe:
+  httpGet:
+    path: /api/health
+    port: 3000
+  failureThreshold: 60
+  periodSeconds: 10
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 472
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+podSecurityContext:
+  fsGroup: 472
+  runAsNonRoot: true
+
+# Ativa o Sidecar que monitora ConfigMaps com a label grafana_dashboard
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: ALL # Procura dashboards em qualquer namespace do k3d
+    multicluster:
+      global:
+        enabled: false
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://kube-prometheus-stack-prometheus.observability.svc.cluster.local
+        access: proxy
+        isDefault: true
+
+dashboards:
+  default:
+    node-exporter:
+      json: |
+        {
+          "title": "Node Exporter Overview",
+          "uid": "node-exp-1",
+          "version": 1
+        }
+
+deploymentStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+# Persistência para o Grafana (Plugins e Configurações)
+persistence:
+  enabled: true
+  storageClassName: local-path
+  accessModes: ["ReadWriteOnce"]
+  size: 1Gi
+
+# Configuração de Provedores de Dashboard
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+envFromSecret:
+  - name: grafana-admin-credentials

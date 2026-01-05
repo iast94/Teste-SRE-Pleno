@@ -1,0 +1,39 @@
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    # Garante que o Prometheus procure ServiceMonitors em todos os namespaces
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorNamespaceSelector: {}
+    podMonitorSelectorNilUsesHelmValues: false
+    
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path # Padrão do k3d/k3s
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+alertmanager:
+  enabled: true
+  spec:
+    resources:
+      limits:
+        memory: "100Mi"
+  alertmanagerSpec:
+    replicas: 1
+
+nodeExporter:
+  enabled: true # Importante para métricas do host (WSL/Ubuntu)
+
+kubeStateMetrics:
+  enabled: true # Importante para métricas de saúde dos Pods

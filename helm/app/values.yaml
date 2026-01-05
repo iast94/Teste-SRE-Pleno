@@ -1,0 +1,73 @@
+namespace: sre-test
+replicaCount: 2
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+image:
+  repository: iast94/sre-app
+  pullPolicy: Always
+  tag: "latest"
+
+securityContext:
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+service:
+  port: 8080
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    successThreshold: 1
+    failureThreshold: 3
+  readiness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    successThreshold: 1
+    failureThreshold: 3
+  startup:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    successThreshold: 1
+    failureThreshold: 30 # Dá até 150s (30x5s) para o app iniciar antes de desistir
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+# Configuração de Topology Spread Constraints (Baseado no seu projeto GitHub)
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: "kubernetes.io/hostname"
+    whenUnsatisfiable: DoNotSchedule # Garante que os pods fiquem em nós diferentes
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: my-app
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPU: 70
+  targetMemory: 75
+
+env:
+  APP_ENV: staging
+  configMapKey: APP_ENV
+
+pdb:
+  enabled: true
+  minAvailable: 1  # Garante 50% de disponibilidade durante manutenções

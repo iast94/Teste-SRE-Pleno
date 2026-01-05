@@ -1,0 +1,52 @@
+repositories:
+  - name: prometheus-community
+    url: https://prometheus-community.github.io/helm-charts
+  - name: grafana
+    url: https://grafana.github.io/helm-charts
+
+releases:
+  # Tarefa 3: Stack de Monitoramento (Prioridade 1)
+  - name: kube-prometheus-stack
+    namespace: observability
+    chart: prometheus-community/kube-prometheus-stack
+    version: 65.4.0
+    installed: true
+    createNamespace: true
+    values:
+      - ./helm/values-prometheus.yaml
+    # Hook indispensável para evitar erros de 'kind not found'
+    hooks:
+      - events: ["prepare"]
+        showlogs: true
+        command: "kubectl"
+        args: ["apply", "--server-side", "-f", "https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/v0.76.2/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml"]
+
+  # Tarefa 3: Grafana (Prioridade 2)
+  - name: grafana
+    namespace: observability
+    chart: grafana/grafana
+    version: 7.3.0
+    needs:
+      - observability/kube-prometheus-stack # Garante a ordem correta
+    values:
+      - ./helm/values-grafana.yaml
+    secrets:
+      - ./helm/secrets/grafana-admin-secret.yaml
+
+  - name: grafana-secrets
+    namespace: observability
+    chart: ./helm/secrets/grafana-admin-secret.yaml
+    hooks:
+      - events: ["prepare"]
+        command: "kubectl"
+        args: ["apply", "-f", "./helm/grafana/secrets/grafana-admin-secret.yaml"]
+
+  # Tarefa 2: Sua Aplicação (Prioridade 3)
+  - name: sre-app
+    namespace: sre-test
+    chart: ./helm/app # Caminho organizado conforme sugerido
+    createNamespace: true # O Helmfile cria o namespace se ele não existir
+    needs:
+      - observability/kube-prometheus-stack # App sobe após o monitoramento
+    values:
+      - ./helm/app/values.yaml

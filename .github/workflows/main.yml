@@ -44,19 +44,15 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/sre-app:1.${{ github.run_number }}
             ${{ secrets.DOCKERHUB_USERNAME }}/sre-app:latest
 
-      - name: Deploy to Kubernetes
+      - name: Install Helmfile
+        run: |
+          chmod +x ./scripts/install-helmfile.sh
+          ./scripts/install-helmfile.sh
+
+      - name: Deploy with Helmfile
+        run: helmfile apply --suppress-secrets
         env:
           KUBECONFIG_DATA: ${{ secrets.KUBE_CONFIG_DATA }}
-        run: |
-          mkdir -p ~/.kube
-          echo "$KUBECONFIG_DATA" | base64 -d > ~/.kube/config
-          
-          # Cria o namespace se não existir
-          kubectl create namespace ${K8S_NAMESPACE} --dry-run=client -o yaml | kubectl apply -f -
-          
-          # Atualiza o Helm usando a imagem do Docker Hub
-          helm upgrade --install ${HELM_RELEASE_NAME} ${CHART_PATH} \
-            --namespace ${K8S_NAMESPACE} \
-            --set image.repository=${{ secrets.DOCKERHUB_USERNAME }}/${HELM_RELEASE_NAME} \
-            --set image.tag=1.${{ github.run_number }} \
-            --wait
+          IMAGE_TAG: ${{ github.run_number }}
+          GRAFANA_USER: ${{ secrets.GRAFANA_USER }}
+          GRAFANA_PASSWORD: ${{ secrets.GRAFANA_PASSWORD }}
