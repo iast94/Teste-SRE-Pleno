@@ -11,17 +11,18 @@ SEALED_SECRETS_VERSION="2.15.0"
 
 OBS_NAMESPACE="observability"
 
-SECRET_NAME="grafana-admin-credentials"
-SEALED_SECRET_NAME="grafana-admin-sealed"
+# ⚠️ Convenção fixa (NÃO alterar)
+SECRET_NAME="grafana-admin-credentials"     # Secret real
+SEALED_SECRET_NAME="grafana-admin-sealed"   # SealedSecret (controle)
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" # Diretório raiz do repositório (independente de onde o script é executado)
+# Diretório raiz do repositório (independente de onde o script é executado)
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 BIN_DIR="$ROOT_DIR/.bin"
 YQ_BIN="$BIN_DIR/yq"
 
-mkdir -p "$BIN_DIR"
-
-TMP_DIR=".tmp-secrets"
-PLAIN_SECRET_FILE="${TMP_DIR}/grafana-secret.yaml"
+TMP_DIR="$ROOT_DIR/.tmp-secrets"
+PLAIN_SECRET_FILE="$TMP_DIR/grafana-secret.yaml"
 SEALED_SECRET_FILE="$ROOT_DIR/helm/grafana/secrets/grafana-admin-sealed.yaml"
 
 ############################################
@@ -47,16 +48,24 @@ command -v helm >/dev/null 2>&1 || {
 }
 
 ############################################
-# Pré-requisitos
+# Garantir diretórios
 ############################################
-  if [ ! -x "$YQ_BIN" ]; then
-    echo "▶ Instalando yq localmente"
-    curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 \
-      -o "$YQ_BIN"
-    chmod +x "$YQ_BIN"
-  else
-    echo "▶ yq já disponível"
-  fi
+mkdir -p "$BIN_DIR"
+mkdir -p "$TMP_DIR"
+mkdir -p "$(dirname "$SEALED_SECRET_FILE")"
+
+############################################
+# Garantir yq (local)
+############################################
+if [ ! -x "$YQ_BIN" ]; then
+  log "Instalando yq localmente"
+  curl -fsSL \
+    https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 \
+    -o "$YQ_BIN"
+  chmod +x "$YQ_BIN"
+else
+  log "yq já disponível"
+fi
 
 ############################################
 # 1. Instalar kubeseal (binário local)
@@ -64,8 +73,8 @@ command -v helm >/dev/null 2>&1 || {
 if ! command -v kubeseal >/dev/null 2>&1; then
   log "Instalando kubeseal"
 
-  OS=$(uname | tr '[:upper:]' '[:lower:]')
-  ARCH=$(uname -m)
+  OS="$(uname | tr '[:upper:]' '[:lower:]')"
+  ARCH="$(uname -m)"
 
   case "$ARCH" in
     x86_64) ARCH="amd64" ;;
@@ -81,7 +90,7 @@ if ! command -v kubeseal >/dev/null 2>&1; then
 
   tar -xzf kubeseal.tar.gz kubeseal
   sudo mv kubeseal /usr/local/bin/
-  rm kubeseal.tar.gz
+  rm -f kubeseal.tar.gz
 
   log "kubeseal instalado com sucesso"
 else
@@ -93,26 +102,22 @@ fi
 ############################################
 log "Instalando Sealed Secrets Controller via Helm"
 
-helm repo add sealed-secrets https://bitnami-labs.github.io/sealed-secrets
-helm repo update
+helm repo add sealed-secrets https://bitnami-labs.github.io/sealed-secrets >/dev/null 2>&1 || true
+helm repo update >/dev/null
 
-EXISTING_RELEASE=$(helm list -n "$SEALED_SECRETS_NS" -q | grep sealed-secrets || true)
-
-if [[ -n "$EXISTING_RELEASE" ]]; then
-  log "Sealed Secrets já instalado como release: $EXISTING_RELEASE"
-  SEALED_SECRETS_RELEASE="$EXISTING_RELEASE"
+if helm list -n "$SEALED_SECRETS_NS" -q | grep -q sealed-secrets; then
+  log "Sealed Secrets já instalado"
 else
   helm install "$SEALED_SECRETS_RELEASE" sealed-secrets/sealed-secrets \
     --namespace "$SEALED_SECRETS_NS" \
     --version "$SEALED_SECRETS_VERSION"
 fi
 
-
 log "Aguardando controller ficar pronto..."
 kubectl rollout status deployment/sealed-secrets-controller -n "$SEALED_SECRETS_NS"
 
 ############################################
-# 3. Criar namespace observability (se não existir)
+# 3. Criar namespace observability
 ############################################
 log "Garantindo namespace ${OBS_NAMESPACE}"
 
@@ -123,8 +128,6 @@ kubectl get namespace "$OBS_NAMESPACE" >/dev/null 2>&1 || \
 # 4. Gerar Secret temporário (NÃO versionado)
 ############################################
 log "Gerando Secret temporário para criptografia"
-
-mkdir -p "$TMP_DIR"
 
 read -rp "Grafana admin user: " GRAFANA_USER
 read -srp "Grafana admin password: " GRAFANA_PASSWORD
@@ -138,16 +141,28 @@ kubectl create secret generic "$SECRET_NAME" \
   -o yaml > "$PLAIN_SECRET_FILE"
 
 ############################################
-# 5. Gerar SealedSecret
+# 5. Gerar SealedSecret (NOME DIFERENTE!)
 ############################################
 log "Gerando SealedSecret"
 
 kubeseal \
+  --format yaml \
   --controller-name sealed-secrets-controller \
   --controller-namespace "$SEALED_SECRETS_NS" \
-  --format yaml \
+  --name "$SEALED_SECRET_NAME" \
+  --namespace "$OBS_NAMESPACE" \
   < "$PLAIN_SECRET_FILE" > "$SEALED_SECRET_FILE"
 
+log "Ajustando nome do Secret gerado no template"
+
+"$YQ_BIN" eval "
+  .spec.template.metadata.name = \"$SECRET_NAME\"
+" -i "$SEALED_SECRET_FILE"
+
+
+############################################
+# 6. Injetar annotation de ownership
+############################################
 log "Adicionando annotation de ownership ao SealedSecret"
 
 "$YQ_BIN" eval '
@@ -155,10 +170,9 @@ log "Adicionando annotation de ownership ao SealedSecret"
 ' -i "$SEALED_SECRET_FILE"
 
 ############################################
-# 6. Limpeza
+# 7. Limpeza
 ############################################
 log "Limpando arquivos temporários"
-
 rm -rf "$TMP_DIR"
 
 ############################################
@@ -167,6 +181,9 @@ rm -rf "$TMP_DIR"
 log "SealedSecret gerado com sucesso!"
 log "Arquivo criado: $SEALED_SECRET_FILE"
 
-echo -e "\n✔ Agora você pode versionar APENAS o SealedSecret."
-echo "✔ Nenhuma credencial em texto claro foi commitada."
-echo "✔ O Secret real será criado automaticamente no cluster."
+echo -e "\n✔ Convenção aplicada:"
+echo "  - SealedSecret : $SEALED_SECRET_NAME"
+echo "  - Secret real  : $SECRET_NAME"
+echo "✔ Annotation de ownership aplicada"
+echo "✔ Nenhuma credencial em texto claro foi versionada"
+echo "✔ Secret será reconciliado automaticamente pelo controller"
