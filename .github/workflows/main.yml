@@ -45,17 +45,8 @@ jobs:
 
       - name: Install Helmfile
         run: |
-          HELMFILE_VERSION="1.2.3"
-
-          curl -fL \
-            https://github.com/helmfile/helmfile/releases/download/v${HELMFILE_VERSION}/helmfile_${HELMFILE_VERSION}_linux_amd64.tar.gz \
-            | tar xz
-
-          mkdir -p "$HOME/bin"
-          mv helmfile "$HOME/bin/"
-          echo "$HOME/bin" >> "$GITHUB_PATH"
-
-          helmfile --version
+          chmod +x ./scripts/install-helmfile.sh
+          ./scripts/install-helmfile.sh
 
 
       - name: Deploy with Helmfile
