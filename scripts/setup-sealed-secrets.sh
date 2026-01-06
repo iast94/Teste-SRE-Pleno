@@ -150,9 +150,10 @@ kubeseal \
 
 log "Adicionando annotation de ownership ao SealedSecret"
 
-yq eval '
+"$YQ_BIN" eval '
   .spec.template.metadata.annotations.sealedsecrets.bitnami.com/managed = "true"
 ' -i "$SEALED_SECRET_FILE"
+
 ############################################
 # 6. Limpeza
 ############################################
