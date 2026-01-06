@@ -119,8 +119,17 @@ kubectl get namespace "$OBS_NAMESPACE" >/dev/null 2>&1 || \
 log "Gerando Secret temporário para criptografia"
 
 read -rp "Grafana admin user: " GRAFANA_USER
-read -srp "Grafana admin password: " GRAFANA_PASSWORD
-echo ""
+while true; do
+  read -srp "Grafana admin password (mín. 8 caracteres): " GRAFANA_PASSWORD
+  echo ""
+
+  if [[ ${#GRAFANA_PASSWORD} -lt 8 ]]; then
+    echo "❌ Senha muito curta. Informe pelo menos 8 caracteres."
+    continue
+  fi
+
+  break
+done
 
 kubectl create secret generic "$SECRET_NAME" \
   --from-literal=admin-user="$GRAFANA_USER" \
