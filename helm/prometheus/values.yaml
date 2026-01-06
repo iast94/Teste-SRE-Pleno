@@ -13,6 +13,27 @@ prometheus:
       limits:
         memory: "512Mi"
         cpu: "500m"
+    
+    livenessProbe:
+      httpGet:
+        path: /-/healthy
+        port: web
+      initialDelaySeconds: 30
+      periodSeconds: 15
+
+    readinessProbe:
+      httpGet:
+        path: /-/ready
+        port: web
+      initialDelaySeconds: 10
+      periodSeconds: 5
+    
+    startupProbe:
+      httpGet:
+        path: /-/ready
+        port: web
+      failureThreshold: 60
+      periodSeconds: 5
 
     storageSpec:
       volumeClaimTemplate:
