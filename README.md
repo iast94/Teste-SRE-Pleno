@@ -168,7 +168,8 @@ A automação do ciclo de vida da aplicação foi implementada via GitHub Action
 ### 3. Pipeline de Entrega Contínua (CD)
 * **Helm Lint:** Antes de qualquer alteração no cluster, o pipeline executa o `helm lint` para validar a sintaxe e as boas práticas dos templates do Chart, evitando falhas de deploy por erros de indentação ou lógica de template.
 * **Uso de `run` para Deploys Críticos:** Para as etapas de deploy (Helmfile), foi priorizado o uso de comandos `run`. Esta decisão técnica visa o controle total sobre a infraestrutura de CI/CD, permitindo maior visibilidade de debug e evitando a dependência de "caixas-pretas" de terceiros no caminho crítico de produção.
-* **Instalação via Script de Bootstrap:** A instalação do Helmfile no Runner foi realizada através de um script de shell customizado. Esta prática permite o versionamento da lógica de instalação, garante que a mesma versão do binário seja utilizada em qualquer ambiente e facilita a testabilidade local do processo de setup.
+* **Instalação vdo Helmfile:** O Helmfile é instalado dinamicamente durante a execução do pipeline utilizando um passo `run` inline no GitHub Actions.  
+  Essa abordagem garante uma instalação **determinística e não interativa**, com versionamento explícito do binário (`HELMFILE_VERSION="1.2.3"`), assegurando consistência entre execuções e evitando dependência de scripts locais no runner.
 * **Orquestração Declarativa:** Foi utilizado o **Helmfile** para gerenciar a aplicação e suas dependências de forma declarativa, permitindo aplicar toda a stack com um único comando `helmfile apply`.
 * **Idempotência e Sincronização:** O Helmfile garante que o cluster reflita exatamente o estado definido nos arquivos de configuração, tratando atualizações e instalações de forma nativa e segura.
 * **Abstração de Ambientes:** O uso do Helmfile facilita a separação de contextos, permitindo que o mesmo pipeline gerencie diferentes estados do cluster de forma organizada.

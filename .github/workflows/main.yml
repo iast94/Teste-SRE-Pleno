@@ -45,8 +45,13 @@ jobs:
 
       - name: Install Helmfile
         run: |
-          chmod +x ./scripts/install-helmfile.sh
-          ./scripts/install-helmfile.sh
+          HELMFILE_VERSION="1.2.3"
+          curl -fsSL https://github.com/helmfile/helmfile/releases/download/v${HELMFILE_VERSION}/helmfile_linux_amd64.tar.gz \
+            | tar xz
+          mkdir -p $HOME/bin
+          mv helmfile $HOME/bin/
+          echo "$HOME/bin" >> $GITHUB_PATH
+          helmfile --version
 
       - name: Deploy with Helmfile
         run: helmfile apply --suppress-secrets
