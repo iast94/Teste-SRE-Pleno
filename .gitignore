@@ -16,3 +16,6 @@ pub-cert.pem
 
 # Temporary secret generation files
 .tmp-secrets/
+
+# Arquivos binarios
+.bin/

@@ -14,9 +14,14 @@ OBS_NAMESPACE="observability"
 SECRET_NAME="grafana-admin-credentials"
 SEALED_SECRET_NAME="grafana-admin-sealed"
 
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" # Diretório raiz do repositório (independente de onde o script é executado)
+BIN_DIR="$ROOT_DIR/.bin"
+YQ_BIN="$BIN_DIR/yq"
+
+mkdir -p "$BIN_DIR"
+
 TMP_DIR=".tmp-secrets"
 PLAIN_SECRET_FILE="${TMP_DIR}/grafana-secret.yaml"
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" # Diretório raiz do repositório (independente de onde o script é executado)
 SEALED_SECRET_FILE="$ROOT_DIR/helm/grafana/secrets/grafana-admin-sealed.yaml"
 
 ############################################
@@ -40,6 +45,18 @@ command -v helm >/dev/null 2>&1 || {
   echo "❌ helm não encontrado"
   exit 1
 }
+
+############################################
+# Pré-requisitos
+############################################
+  if [ ! -x "$YQ_BIN" ]; then
+    echo "▶ Instalando yq localmente"
+    curl -fsSL https://github.com/mikefarah/yq/releases/download/v4.43.1/yq_linux_amd64 \
+      -o "$YQ_BIN"
+    chmod +x "$YQ_BIN"
+  else
+    echo "▶ yq já disponível"
+  fi
 
 ############################################
 # 1. Instalar kubeseal (binário local)
@@ -131,6 +148,11 @@ kubeseal \
   --format yaml \
   < "$PLAIN_SECRET_FILE" > "$SEALED_SECRET_FILE"
 
+log "Adicionando annotation de ownership ao SealedSecret"
+
+yq eval '
+  .spec.template.metadata.annotations.sealedsecrets.bitnami.com/managed = "true"
+' -i "$SEALED_SECRET_FILE"
 ############################################
 # 6. Limpeza
 ############################################
