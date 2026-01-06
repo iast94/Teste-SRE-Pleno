@@ -1,5 +1,5 @@
 admin:
-  existingSecret: "grafana-admin-sealed"
+  existingSecret: "grafana-admin-credentials"
   userKey: admin-user
   passwordKey: admin-password
 
