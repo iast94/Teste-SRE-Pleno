@@ -14,12 +14,9 @@ releases:
     createNamespace: true # O Helmfile cria o namespace se ele não existir
     values:
       - ./helm/prometheus/values.yaml
-      - prometheus:
-          prometheusSpec:
-            podMetadata:
-              annotations:
-                # Gera um hash baseado no arquivo de values local. O hash só muda se o CONTEÚDO do arquivo mudar
-                checksum/config: {{ readFile "helm/prometheus/values.yaml" | sha256sum }}
+    set:
+      - name: prometheus.prometheusSpec.podMetadata.annotations.checksum/config
+        value: {{ .Values | toJson | sha256sum }}
     # Hook indispensável para evitar erros de 'kind not found'
     hooks:
       - events: ["prepare"]
@@ -36,11 +33,10 @@ releases:
       - observability/kube-prometheus-stack # Garante a ordem correta
     values:
       - ./helm/grafana/values.yaml
-      - podAnnotations:
-          # Monitora mudanças no arquivo principal de configuração
-          config-checksum: {{ readFile "helm/grafana/values.yaml" | sha256sum }}
-          # Monitora mudanças especificamente no arquivo de senha selada
-          secret-checksum: {{ readFile "helm/grafana/secrets/grafana-admin-sealed.yaml" | sha256sum }}
+    set:
+      - name: podAnnotations.config-checksum
+        # Esta linha cria um hash único que muda se QUALQUER um dos dois arquivos mudar
+        value: {{ list .Values (readFile "helm/grafana/secrets/grafana-admin-sealed.yaml") | toJson | sha256sum }}
     hooks:
       - events: ["presync"] # Executa após a garantia do namespace, mas antes do sync da release
         showlogs: true
