@@ -88,9 +88,9 @@ releases:
     # Injeta os arquivos JSON como ConfigMaps para o Job ler
     set:
       - name: extraConfigMaps.kibana-setup-config.data.index-pattern\.json
-        value: {{ readFile "helm/elk/files/index-pattern.json" | quote }}
+        value: {{ readFile "./helm/elk/files/index-pattern.json" | quote }}
       - name: extraConfigMaps.kibana-dashboards-content.data.kibana-dashboard\.ndjson
-        value: {{ readFile "elk/dashboard/kibana-dashboard.json" | quote }}
+        value: {{ readFile "./helm/elk/dashboard/kibana-dashboard.json" | quote }}
 
   # Tarefa 5: Filebeat (Coleta de Logs via DaemonSet)
   - name: filebeat
