@@ -34,3 +34,15 @@ readinessProbe:
 startupProbe:
   failureThreshold: 30
   periodSeconds: 10
+
+# Força O usuário elastic usar a senha do Secret
+esConfig:
+  elasticsearch.yml: |
+    xpack.security.enabled: true
+
+extraEnvs:
+  - name: ELASTIC_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: elasticsearch-master-credentials
+        key: password

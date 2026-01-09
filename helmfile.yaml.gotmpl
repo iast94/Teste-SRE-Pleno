@@ -58,6 +58,15 @@ releases:
       - name: image.tag
         value: {{ requiredEnv "IMAGE_TAG" }}
 
+  # Tarefa 5: Elasticsearch (Secret)
+  - name: elasticsearch-secrets
+    namespace: observability
+    chart: ""
+    hooks:
+      - events: ["presync"]
+        command: kubectl
+        args: ["apply", "-f", "./helm/elk/templates/elasticsearch-secret.yaml"]     
+
   # Tarefa 5: Elasticsearch (Camada de Dados)
   - name: elasticsearch
     namespace: observability
