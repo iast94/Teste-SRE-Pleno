@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ############################################
-# Configurações
+# Variáveis Globais
 ############################################
 SEALED_SECRETS_NS="kube-system"
 SEALED_SECRETS_RELEASE="sealed-secrets-controller"
@@ -11,20 +11,15 @@ SEALED_SECRETS_VERSION="2.15.0"
 
 OBS_NAMESPACE="observability"
 
-# ⚠️ Convenção fixa (NÃO alterar)
-SECRET_NAME="grafana-admin-credentials"     # Secret real
-SEALED_SECRET_NAME="grafana-admin-sealed"   # SealedSecret (controle)
-
 # Diretório raiz do repositório
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 BIN_DIR="$ROOT_DIR/.bin"
 YQ_BIN="$BIN_DIR/yq"
-
 TMP_DIR="$ROOT_DIR/.tmp-secrets"
-PLAIN_SECRET_FILE="$TMP_DIR/grafana-secret.yaml"
-SEALED_SECRET_FILE="$ROOT_DIR/helm/grafana/secrets/grafana-admin-sealed.yaml"
 
+SEALED_SECRET_FILE="$ROOT_DIR/helm/grafana/secrets/grafana-admin-sealed.yaml"
+ELASTIC_SEALED_SECRET_FILE="$ROOT_DIR/helm/elk/secrets/elasticsearch-admin-sealed.yaml"
 ############################################
 # Helpers
 ############################################
@@ -46,6 +41,7 @@ command -v helm >/dev/null 2>&1 || { echo "❌ helm não encontrado"; exit 1; }
 mkdir -p "$BIN_DIR"
 mkdir -p "$TMP_DIR"
 mkdir -p "$(dirname "$SEALED_SECRET_FILE")"
+mkdir -p "$(dirname "$ELASTIC_SEALED_SECRET_FILE")"
 
 ############################################
 # Garantir yq
@@ -61,7 +57,7 @@ else
 fi
 
 ############################################
-# 1. Instalar kubeseal
+# Instalar kubeseal
 ############################################
 if ! command -v kubeseal >/dev/null 2>&1; then
   log "Instalando kubeseal"
@@ -88,7 +84,7 @@ else
 fi
 
 ############################################
-# 2. Instalar Sealed Secrets Controller
+# Instalar Sealed Secrets Controller
 ############################################
 log "Garantindo Sealed Secrets Controller"
 
@@ -107,14 +103,26 @@ log "Aguardando controller ficar pronto..."
 kubectl rollout status deployment/sealed-secrets-controller -n "$SEALED_SECRETS_NS"
 
 ############################################
-# 3. Garantir namespace observability
+# Garantir namespace observability
 ############################################
 log "Garantindo namespace ${OBS_NAMESPACE}"
 kubectl get namespace "$OBS_NAMESPACE" >/dev/null 2>&1 || \
   kubectl create namespace "$OBS_NAMESPACE"
 
+# ------------------------
+# Grafana
+# ------------------------
 ############################################
-# 4. Criar Secret temporário (plain)
+# Configurações
+############################################
+# ⚠️ Convenção fixa (NÃO alterar)
+SECRET_NAME="grafana-admin-credentials"     # Secret real
+SEALED_SECRET_NAME="grafana-admin-sealed"   # SealedSecret (controle)
+
+PLAIN_SECRET_FILE="$TMP_DIR/grafana-secret.yaml"
+
+############################################
+# Criar Secret temporário (plain)
 ############################################
 log "Gerando Secret temporário para criptografia"
 
@@ -139,7 +147,7 @@ kubectl create secret generic "$SECRET_NAME" \
   -o yaml > "$PLAIN_SECRET_FILE"
 
 ############################################
-# 5. Gerar SealedSecret
+# Gerar SealedSecret
 ############################################
 log "Gerando SealedSecret"
 
@@ -152,7 +160,7 @@ kubeseal \
   < "$PLAIN_SECRET_FILE" > "$SEALED_SECRET_FILE"
 
 ############################################
-# 6. Corrigir template (NOME + TYPE + ANNOTATION)
+# Corrigir template (NOME + TYPE + ANNOTATION)
 ############################################
 log "Ajustando template do SealedSecret"
 
@@ -162,12 +170,6 @@ log "Ajustando template do SealedSecret"
   .spec.template.metadata.annotations.\"sealedsecrets.bitnami.com/managed\" = \"true\" |
   .spec.template.type = \"Opaque\"
 " -i "$SEALED_SECRET_FILE"
-
-############################################
-# 7. Limpeza
-############################################
-log "Limpando arquivos temporários"
-rm -rf "$TMP_DIR"
 
 ############################################
 # Final
@@ -181,3 +183,69 @@ echo "  - Secret real  : $SECRET_NAME"
 echo "  - type         : Opaque"
 echo "  - managed      : true"
 echo "✔ Pronto para aplicar no cluster com kubectl ou Helmfile"
+
+# ------------------------
+# Elasticsearch
+# ------------------------
+############################################
+# Configurações
+############################################
+ELASTIC_SECRET_NAME="elasticsearch-master-credentials"
+ELASTIC_SEALED_SECRET_NAME="elasticsearch-admin"
+ELASTIC_PLAIN_SECRET_FILE="$TMP_DIR/elasticsearch-secret.yaml"
+
+############################################
+# Criar Secret temporário (plain)
+############################################
+log "Gerando Secret temporário do Elasticsearch"
+
+while true; do
+  read -srp "Elastic password (mín. 8 caracteres): " ELASTIC_PASSWORD
+  echo ""
+
+  if [[ ${#ELASTIC_PASSWORD} -lt 8 ]]; then
+    echo "❌ Senha muito curta. Informe pelo menos 8 caracteres."
+    continue
+  fi
+
+  break
+done
+
+kubectl create secret generic "$ELASTIC_SECRET_NAME" \
+  --from-literal=username=elastic \
+  --from-literal=password="$ELASTIC_PASSWORD" \
+  --namespace "$OBS_NAMESPACE" \
+  --dry-run=client \
+  -o yaml > "$ELASTIC_PLAIN_SECRET_FILE"
+
+############################################
+# Gerar SealedSecret
+############################################
+log "Gerando SealedSecret do Elasticsearch"
+
+kubeseal \
+  --format yaml \
+  --controller-name sealed-secrets-controller \
+  --controller-namespace "$SEALED_SECRETS_NS" \
+  --name "$ELASTIC_SEALED_SECRET_NAME" \
+  --namespace "$OBS_NAMESPACE" \
+  < "$ELASTIC_PLAIN_SECRET_FILE" > "$ELASTIC_SEALED_SECRET_FILE"
+
+############################################
+# Final
+############################################
+log "SealedSecret gerado com sucesso!"
+log "Arquivo criado: $ELASTIC_SEALED_SECRET_FILE"
+
+echo -e "\n✔ Resultado final garantido:"
+echo "  - SealedSecret : $ELASTIC_SEALED_SECRET_NAME"
+echo "  - Secret real  : $ELASTIC_SECRET_NAME"
+echo "  - type         : Opaque"
+echo "  - managed      : true"
+echo "✔ Pronto para aplicar no cluster com kubectl ou Helmfile"
+
+############################################
+# Limpeza
+############################################
+log "Limpando arquivos temporários"
+rm -rf "$TMP_DIR"

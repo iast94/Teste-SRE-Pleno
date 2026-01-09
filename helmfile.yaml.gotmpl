@@ -58,15 +58,6 @@ releases:
       - name: image.tag
         value: {{ requiredEnv "IMAGE_TAG" }}
 
-  # Tarefa 5: Elasticsearch (Secret)
-  - name: elasticsearch-secrets
-    namespace: observability
-    chart: ""
-    hooks:
-      - events: ["presync"]
-        command: kubectl
-        args: ["apply", "-f", "./helm/elk/templates/elasticsearch-secret.yaml"]     
-
   # Tarefa 5: Elasticsearch (Camada de Dados)
   - name: elasticsearch
     namespace: observability
@@ -74,6 +65,11 @@ releases:
     version: 8.5.1
     values:
       - ./helm/elk/elasticsearch-values.yaml
+    hooks:
+    - events: ["presync"]
+      showlogs: true
+      command: kubectl
+      args: ["apply", "-f", "./helm/elk/secrets/elasticsearch-admin-sealed.yaml"]
 
   # Tarefa 5: Logstash (Coleta de logs)
   - name: logstash
