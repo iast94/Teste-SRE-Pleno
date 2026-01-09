@@ -13,7 +13,7 @@ daemonset:
                   logs_path: "/var/log/containers/"
 
       output.logstash:
-        hosts: ["logstash-logstash:5044"]
+        hosts: ["logstash-logstash-headless:5044"]
 
 # Recursos para evitar consumo desenfreado no nó
 resources:
