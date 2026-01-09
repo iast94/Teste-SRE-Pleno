@@ -1,3 +1,22 @@
+# Configura o Job de pré-instalação para usar a senha do Secret
+passwordFromSecret:
+  name: elasticsearch-admin # Nome exato do seu SealedSecret
+  key: password
+
+# Injeta o Usuário e a Senha para o Pod do Kibana via variáveis de ambiente
+extraEnvs:
+  - name: ELASTICSEARCH_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: elasticsearch-admin
+        key: username # Chave do usuário no seu SealedSecret
+  - name: ELASTICSEARCH_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: elasticsearch-admin
+        key: password # Chave da senha no seu SealedSecret
+
+# Garante o protocolo correto para evitar o erro 401 de handshake
 elasticsearchHosts: "https://elasticsearch-master:9200"
 
 resources:

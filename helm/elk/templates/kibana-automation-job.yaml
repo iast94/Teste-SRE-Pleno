@@ -19,21 +19,30 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
           - |
-            # Aguarda o Kibana e Elasticsearch (200 OK)
-            until $(curl -s -o /dev/null -w "%{http_code}" http://elasticsearch-master:9200/_cluster/health | grep -q "200"); do
+            # Aguarda o Kibana e Elasticsearch (Adicionado -k para HTTPS)
+            until $(curl -k -s -o /dev/null -w "%{http_code}" https://elasticsearch-master:9200/_cluster/health | grep -q "200"); do
               echo "Aguardando Elasticsearch ficar saudável..."
               sleep 10
             done
-            until $(curl -s -o /dev/null -w "%{http_code}" http://kibana-kibana:5601/api/status | grep -q "200"); do
+            until $(curl -k -s -o /dev/null -w "%{http_code}" https://kibana-kibana:5601/api/status | grep -q "200"); do
               echo "Aguardando Kibana ficar pronto..."
               sleep 10
             done
-            # 1. Importa Index Pattern
-            curl -X POST "http://kibana-kibana:5601/api/saved_objects/index-pattern" -H "kbn-xsrf: true" -H "Content-Type: application/json" -d @/data/index-pattern.json
-            # 2. Importa Dashboard
-            curl -X POST "http://kibana-kibana:5601/api/saved_objects/_import?overwrite=true" -H "kbn-xsrf: true" --form file=@/data/kibana-dashboard.ndjson
-            # 3. Importa Alerta (Tarefa 5.4)
-            curl -X POST "http://kibana-kibana:5601/api/alerting/rule" -H "kbn-xsrf: true" -H "Content-Type: application/json" -d @/data/alert-rule.json
+
+            # 1. Importa Index Pattern (Adicionado -k e autenticação -u)
+            curl -k -X POST "https://kibana-kibana:5601/api/saved_objects/index-pattern" \
+              -H "kbn-xsrf: true" -H "Content-Type: application/json" \
+              -u "elastic:${ELASTICSEARCH_PASSWORD}" -d @/data/index-pattern.json
+
+            # 2. Importa Dashboard (Adicionado -k e autenticação -u)
+            curl -k -X POST "https://kibana-kibana:5601/api/saved_objects/_import?overwrite=true" \
+              -H "kbn-xsrf: true" -u "elastic:${ELASTICSEARCH_PASSWORD}" \
+              --form file=@/data/kibana-dashboard.ndjson
+
+            # 3. Importa Alerta (Adicionado -k e autenticação -u)
+            curl -k -X POST "https://kibana-kibana:5601/api/alerting/rule" \
+              -H "kbn-xsrf: true" -H "Content-Type: application/json" \
+              -u "elastic:${ELASTICSEARCH_PASSWORD}" -d @/data/alert-rule.json
         volumeMounts:
         - name: config-files
           mountPath: /data
