@@ -42,17 +42,18 @@ app.use((req, res, next) => {
 
   res.on('finish', () => {
     const diff = process.hrtime(start);
-    const durationSeconds = diff[0] + diff[1] / 1e9;
-
+    const durationMs = (diff[0] * 1e3 + diff[1] / 1e6).toFixed(2);
     const route = req.route?.path || req.path;
+    const timestamp = new Date().toISOString();
+    const level = res.statusCode >= 500 ? 'ERROR' : 'INFO';
 
-    httpRequestsTotal
-      .labels(req.method, route, res.statusCode.toString())
-      .inc();
+    // Este log abaixo bate exatamente com o seu filtro Grok do Logstash:
+    // %{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{URIPATHPARAM:endpoint} latency=%{NUMBER:latency:float}ms
+    console.log(`${timestamp} ${level} ${route} latency=${durationMs}ms`);
 
-    httpRequestDurationSeconds
-      .labels(req.method, route, res.statusCode.toString())
-      .observe(durationSeconds);
+    // Mantém as métricas do Prometheus
+    httpRequestsTotal.labels(req.method, route, res.statusCode.toString()).inc();
+    httpRequestDurationSeconds.labels(req.method, route, res.statusCode.toString()).observe(durationMs / 1000);
   });
 
   next();
