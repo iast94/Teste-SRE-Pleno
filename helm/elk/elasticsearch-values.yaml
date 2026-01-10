@@ -47,3 +47,5 @@ extraEnvs:
         name: elasticsearch-admin
         key: password
 
+secret:
+  enabled: false
