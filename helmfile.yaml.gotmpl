@@ -67,7 +67,11 @@ releases:
     - events: ["presync"]
       showlogs: true
       command: kubectl
-      args: ["apply", "-f", "./helm/elk/secrets/elasticsearch-admin-sealed.yaml",--namespace=observability, --create-namespace]
+      args:
+        - -c
+        - |
+          kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -n observability -f ./helm/elk/secrets/elasticsearch-admin-sealed.yaml
 
   # Tarefa 5: Logstash (Coleta de logs)
   - name: logstash
