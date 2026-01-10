@@ -1,4 +1,5 @@
 elasticsearchHosts: "https://elasticsearch-master:9200"
+elasticsearchCredentialSecret: elasticsearch-admin
 
 resources:
   requests:
