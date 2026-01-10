@@ -17,26 +17,24 @@ service:
   type: ClusterIP
   port: 5601
 
-# Probes devem estar no nível raiz e corretamente formatadas
-healthCheckPath: /api/status
-
 livenessProbe:
-  httpGet:
-    path: /api/status
-    port: 5601
+  enabled: true
+  path: /api/status
   initialDelaySeconds: 30
   periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
 
 readinessProbe:
-  httpGet:
-    path: /api/status
-    port: 5601
+  enabled: true
+  path: /api/status
   initialDelaySeconds: 120
   periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 6
 
 startupProbe:
-  httpGet:
-    path: /api/status
-    port: 5601
-  failureThreshold: 20
+  enabled: true
+  path: /api/status
   periodSeconds: 5
+  failureThreshold: 20
