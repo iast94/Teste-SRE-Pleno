@@ -1,4 +1,3 @@
-# Garante o protocolo correto para evitar o erro 401 de handshake
 elasticsearchHosts: "https://elasticsearch-master:9200"
 
 resources:
@@ -36,10 +35,6 @@ startupProbe:
   periodSeconds: 5
   failureThreshold: 20
 
-elasticsearch:
-  username: ${ELASTICSEARCH_USERNAME}
-  password: ${ELASTICSEARCH_PASSWORD}
-
 extraEnvs:
   - name: ELASTICSEARCH_PASSWORD
     valueFrom:
@@ -52,3 +47,7 @@ extraEnvs:
       secretKeyRef:
         name: elasticsearch-admin
         key: username
+
+elasticsearch:
+  username: ${ELASTICSEARCH_USERNAME}
+  password: ${ELASTICSEARCH_PASSWORD}        
