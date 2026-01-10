@@ -191,13 +191,16 @@ echo "✔ Pronto para aplicar no cluster com kubectl ou Helmfile"
 # Configurações
 ############################################
 ELASTIC_SECRET_NAME="elasticsearch-master-credentials"
-ELASTIC_SEALED_SECRET_NAME="elasticsearch-admin"
+ELASTIC_SEALED_SECRET_NAME="elasticsearch-master-credentials"
 ELASTIC_PLAIN_SECRET_FILE="$TMP_DIR/elasticsearch-secret.yaml"
 
 ############################################
 # Criar Secret temporário (plain)
 ############################################
 log "Gerando Secret temporário do Elasticsearch"
+
+read -rp "Elasticsearch username [elastic]: " ELASTIC_USERNAME
+ELASTIC_USERNAME=${ELASTIC_USERNAME:-elastic}
 
 while true; do
   read -srp "Elastic password (mín. 8 caracteres): " ELASTIC_PASSWORD
@@ -212,7 +215,7 @@ while true; do
 done
 
 kubectl create secret generic "$ELASTIC_SECRET_NAME" \
-  --from-literal=username=elastic \
+  --from-literal=username="$ELASTIC_USERNAME" \
   --from-literal=password="$ELASTIC_PASSWORD" \
   --namespace "$OBS_NAMESPACE" \
   --dry-run=client \
@@ -232,14 +235,27 @@ kubeseal \
   < "$ELASTIC_PLAIN_SECRET_FILE" > "$ELASTIC_SEALED_SECRET_FILE"
 
 ############################################
+# Ajustar template
+############################################
+log "Ajustando template do SealedSecret"
+
+"$YQ_BIN" eval "
+  .spec.template.metadata.name = \"$ELASTIC_SECRET_NAME\" |
+  .spec.template.metadata.namespace = \"$OBS_NAMESPACE\" |
+  .spec.template.metadata.annotations.\"sealedsecrets.bitnami.com/managed\" = \"true\" |
+  .spec.template.type = \"Opaque\"
+" -i "$ELASTIC_SEALED_SECRET_FILE"
+
+############################################
 # Final
 ############################################
-log "SealedSecret gerado com sucesso!"
+log "SealedSecret do Elasticsearch gerado com sucesso!"
 log "Arquivo criado: $ELASTIC_SEALED_SECRET_FILE"
 
 echo -e "\n✔ Resultado final garantido:"
 echo "  - SealedSecret : $ELASTIC_SEALED_SECRET_NAME"
 echo "  - Secret real  : $ELASTIC_SECRET_NAME"
+echo "  - username     : $ELASTIC_USERNAME"
 echo "  - type         : Opaque"
 echo "  - managed      : true"
 echo "✔ Pronto para aplicar no cluster com kubectl ou Helmfile"
