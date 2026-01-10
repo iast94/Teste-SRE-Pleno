@@ -40,13 +40,14 @@ esConfig:
   elasticsearch.yml: |
     xpack.security.enabled: true
 
-#extraEnvs:
-#  - name: ELASTIC_PASSWORD
+extraEnvs:
+  - name: ELASTIC_PASSWORD
+    value: "12345678"
 #    valueFrom:
 #      secretKeyRef:
 #        name: elasticsearch-admin
 #        key: password
 
-secret:
-  enabled: true
-  password: "12345678" # generated randomly if not defined
+#secret:
+#  enabled: true
+#  password: "12345678" # generated randomly if not defined
