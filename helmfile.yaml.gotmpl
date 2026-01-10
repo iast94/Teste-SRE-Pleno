@@ -67,7 +67,7 @@ releases:
     - events: ["presync"]
       showlogs: true
       command: kubectl
-      args: ["apply", "-f", "./helm/elk/secrets/elasticsearch-admin-sealed.yaml"]
+      args: ["apply", "-f", "./helm/elk/secrets/elasticsearch-admin-sealed.yaml",--namespace=observability, --create-namespace]
 
   # Tarefa 5: Logstash (Coleta de logs)
   - name: logstash
